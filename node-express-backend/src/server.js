@@ -6,7 +6,21 @@ import { fileURLToPath } from 'url';
 import multer from 'multer';
 import * as dotenv from 'dotenv' // see https://github.com/motdotla/dotenv#how-do-i-use-dotenv-with-import
 import bodyParser from 'body-parser'
+import mongoose from 'mongoose';
+import Customer from './customerModel.js';
+
 dotenv.config()
+
+const mongoURI = process.env.MONGO_URI;
+
+mongoose.connect(mongoURI)
+
+const db = mongoose.connection;
+
+db.on('error', (error) => console.error(error));
+db.once('open', () => console.log('Connected to Database'));
+
+
 
 const jsonParser = bodyParser.json()
 
@@ -16,6 +30,8 @@ console.log(__dirname);
 
 const app = express()
 const port = 8000
+
+app.use(express.json());  // middleware needed to grab json data from request and add to req.body
 //here is a change
 app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, '../build')));
@@ -38,16 +54,40 @@ console.log(movieData);
     {"title":"Die Hard"}
 ];*/
 
+app.post('/api/addInfo', async (req, res) => {
+  try {
+    const { name, movie, email } = req.body;
+
+    if (!name || !movie || !email) {
+      return res.status(206).json({ error: 'Missing required fields' });
+    }
+
+    const newCustomer = new Customer({
+      name,
+      movie,
+      email
+    });
+
+    // Save the customer info to the "Infos" collection
+    await newCustomer.save();
+
+    return res.status(201).json({ message: 'Customer info added successfully' });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.get('/api/movies', async (req, res) => {
     
     //res.json(movieData)
-    const client = new MongoClient(process.env.MONGO_CONNECT);
+    const client = new MongoClient(process.env.MONGO_URI);
     
     await client.connect();
 
-    const db = client.db('movies');
+    const db = client.db('movie-data');
 
-    const movieData = await db.collection('reviews').find({}).toArray();
+    const movieData = await db.collection('movie').find({}).toArray();
     console.log(movieData);
     res.json(movieData);
 
